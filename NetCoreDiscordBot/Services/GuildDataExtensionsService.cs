@@ -10,12 +10,12 @@ namespace NetCoreDiscordBot.Services
 {
     public class GuildDataExtensionsService
     {
-        private readonly DiscordShardedClient _discordClient;
+        private readonly DiscordSocketClient _discordClient;
         private readonly GuildDataExtensionsContext _dataBase;
         public Dictionary<SocketGuild, GuildDataExtension> ExtendedGuilds { get; set; }
         public GuildDataExtensionsService(IServiceProvider services)
         {
-            _discordClient = services.GetRequiredService<DiscordShardedClient>();
+            _discordClient = services.GetRequiredService<DiscordSocketClient>();
             _dataBase = services.GetRequiredService<GuildDataExtensionsContext>();
             ExtendedGuilds = new Dictionary<SocketGuild, GuildDataExtension>();
 

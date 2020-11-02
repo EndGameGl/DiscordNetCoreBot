@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace NetCoreDiscordBot.Modules.Commands
 {
-    public class InfoModule : ModuleBase<ShardedCommandContext>
+    public class InfoModule : ModuleBase<SocketCommandContext>
     {
         private GuildDataExtensionsService _guildDataExtensionsService { get; }
         private CommandHandlingService _commandsService { get; }

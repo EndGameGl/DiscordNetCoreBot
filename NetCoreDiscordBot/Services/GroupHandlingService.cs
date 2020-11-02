@@ -14,26 +14,27 @@ namespace NetCoreDiscordBot.Services
     public class GroupHandlingService
     {
         private readonly DebugService _debugService;
-        private readonly DiscordShardedClient _discordClient;
+        private readonly DiscordSocketClient _discordClient;
         private readonly GroupsContext dataBase;
-        public Dictionary<SocketGuild, List<Group>> GuildGroupLists { get; set; }
+        public Dictionary<ulong, List<Group>> GuildGroupLists { get; set; }
         public GroupHandlingService(IServiceProvider services)
         {
             _debugService = services.GetRequiredService<DebugService>();
-            _discordClient = services.GetRequiredService<DiscordShardedClient>();
+            _discordClient = services.GetRequiredService<DiscordSocketClient>();
             dataBase = services.GetRequiredService<GroupsContext>();
-            GuildGroupLists = new Dictionary<SocketGuild, List<Group>>();
+            GuildGroupLists = new Dictionary<ulong, List<Group>>();
         }
         public async Task InitializeAsync()
         {
             foreach (var guild in _discordClient.Guilds)
             {
-                GuildGroupLists.Add(guild, new List<Group>());
+                if (!GuildGroupLists.ContainsKey(guild.Id))
+                    GuildGroupLists.Add(guild.Id, new List<Group>());
             }
         }
         public async Task AddGroupAndSaveToDataBase(Group group)
         {
-            GuildGroupLists[group.Guild].Add(group);
+            GuildGroupLists[group.Guild.Id].Add(group);
             dataBase.Groups.Add(new GroupReference(group));
             await dataBase.SaveChangesAsync();
         }
@@ -49,7 +50,7 @@ namespace NetCoreDiscordBot.Services
         {
             dataBase.Groups.Remove(dataBase.Groups.FirstOrDefault(x => x.GUID == group.Guid));
             await dataBase.SaveChangesAsync();
-            GuildGroupLists[group.Guild].Remove(group);
+            GuildGroupLists[group.Guild.Id].Remove(group);
         }
         public async Task LoadAllGroups()
         {
@@ -58,9 +59,7 @@ namespace NetCoreDiscordBot.Services
                 var references = await dataBase.GetGroupReferences(guild.Id);
                 foreach (var reference in references)
                 {
-                    _debugService.Log($"Loading group {reference.GUID}");
-                    GuildGroupLists[guild].Add(await LoadGroupFromReference(reference));
-                    _debugService.Log($"Group {reference.GUID} loaded");
+                    GuildGroupLists[guild.Id].Add(await LoadGroupFromReference(reference));
                 }
             }
         }
@@ -113,7 +112,7 @@ namespace NetCoreDiscordBot.Services
         }
         public bool IsGroup(SocketGuild guild, ulong messageId)
         {
-            return GuildGroupLists[guild].Any(x => x.PresentationMessage.Id == messageId);
+            return GuildGroupLists[guild.Id].Any(x => x.PresentationMessage.Id == messageId);
         }
     }
 }

@@ -15,24 +15,25 @@ namespace NetCoreDiscordBot.Services
     public class RoleDispenserService
     {
         private readonly RoleDispensersContext _database;
-        private readonly DiscordShardedClient _discordClient;
-        public Dictionary<SocketGuild, List<RoleDispenser>> GuildDispensers { get; set; }
+        private readonly DiscordSocketClient _discordClient;
+        public Dictionary<ulong, List<RoleDispenser>> GuildDispensers { get; set; }
         public RoleDispenserService(IServiceProvider services)
         {
             _database = services.GetRequiredService<RoleDispensersContext>();
-            _discordClient = services.GetRequiredService<DiscordShardedClient>();
-            GuildDispensers = new Dictionary<SocketGuild, List<RoleDispenser>>();
+            _discordClient = services.GetRequiredService<DiscordSocketClient>();
+            GuildDispensers = new Dictionary<ulong, List<RoleDispenser>>();
         }
         public async Task InitializeAsync()
         {
             foreach (var guild in _discordClient.Guilds)
             {
-                GuildDispensers.Add(guild, new List<RoleDispenser>());
+                if (!GuildDispensers.ContainsKey(guild.Id))
+                    GuildDispensers.Add(guild.Id, new List<RoleDispenser>());
             }
         }
         public async Task AddDispenserAndSaveToDataBase(RoleDispenser dispenser)
         {
-            GuildDispensers[dispenser.Guild].Add(dispenser);
+            GuildDispensers[dispenser.Guild.Id].Add(dispenser);
             _database.DispenseresReferences.Add(new RoleDispenserReference(dispenser));
             await _database.SaveChangesAsync();
         }
@@ -48,7 +49,7 @@ namespace NetCoreDiscordBot.Services
         {
             _database.DispenseresReferences.Remove(_database.DispenseresReferences.FirstOrDefault(x => x.Guid == dispenser.Guid));
             await _database.SaveChangesAsync();
-            GuildDispensers[dispenser.Guild].Remove(dispenser);
+            GuildDispensers[dispenser.Guild.Id].Remove(dispenser);
         }
         public async Task LoadAllDispensers()
         {
@@ -57,7 +58,7 @@ namespace NetCoreDiscordBot.Services
                 var references = await _database.GetDispenserReferences(guild.Id);
                 foreach (var reference in references)
                 {
-                    GuildDispensers[guild].Add(await LoadDispenserFromReference(reference));
+                    GuildDispensers[guild.Id].Add(await LoadDispenserFromReference(reference));
                 }
             }
         }
@@ -76,7 +77,7 @@ namespace NetCoreDiscordBot.Services
             Dictionary<IEmote, IRole> bindings = new Dictionary<IEmote, IRole>();
             foreach (var pair in dispenserReference.Bindings)
             {
-                bindings.Add(Emote.Parse(pair.Emote), guild.GetRole(pair.RoleId));
+                bindings.Add(new Emoji(pair.Emote), guild.GetRole(pair.RoleId));
             }
             return new RoleDispenser()
             {
@@ -90,7 +91,7 @@ namespace NetCoreDiscordBot.Services
         }
         public bool IsDispenser(SocketGuild guild, ulong messageId)
         {
-            return GuildDispensers[guild].Any(x => x.ListenedMessage.Id == messageId);
+            return GuildDispensers[guild.Id].Any(x => x.ListenedMessage.Id == messageId);
         }
     }
 }

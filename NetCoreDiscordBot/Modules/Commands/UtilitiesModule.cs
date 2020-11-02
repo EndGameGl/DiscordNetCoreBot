@@ -7,11 +7,11 @@ using System.Threading.Tasks;
 
 namespace NetCoreDiscordBot.Modules.Commands
 {
-    public class UtilitiesModule : ModuleBase<ShardedCommandContext>
+    public class UtilitiesModule : ModuleBase<SocketCommandContext>
     {
         public UtilitiesModule() { }
 
-        [Command("clear")]
+        [Command("clear"), RequireOwner]
         public async Task ClearMessagesRange(int amount)
         {
             var messages = Context.Channel.GetMessagesAsync(amount + 1, CacheMode.AllowDownload).Flatten();

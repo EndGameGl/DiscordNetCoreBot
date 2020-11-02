@@ -6,7 +6,7 @@ using BungieAPI.User;
 namespace NetCoreDiscordBot.Modules.Commands
 {
     [Group("bungie")]
-    public class BungieUserSearchModule : ModuleBase<ShardedCommandContext>
+    public class BungieUserSearchModule : ModuleBase<SocketCommandContext>
     {
         private BungieAPIService _bungieService;
         public BungieUserSearchModule(BungieAPIService service)

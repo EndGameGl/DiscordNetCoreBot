@@ -13,7 +13,7 @@ namespace NetCoreDiscordBot.Modules.Commands
 {
     [Group("dispenser")]
     [RequireContext(ContextType.Guild)]
-    public class DispenserManagementModule : ModuleBase<ShardedCommandContext>
+    public class DispenserManagementModule : ModuleBase<SocketCommandContext>
     {
         private RoleDispenserService _service { get; set; }
         public DispenserManagementModule(RoleDispenserService service)
@@ -21,18 +21,18 @@ namespace NetCoreDiscordBot.Modules.Commands
             _service = service;
         }
 
-        [Command("create")]
+        [Command("create"), RequireOwner]
         public async Task CreateDispenser(params string[] description)
         {
             RoleDispenser dispenser = new RoleDispenser(Context.Guild, (SocketTextChannel)Context.Channel, string.Join(' ', description));
             await dispenser.SendMessage();
             await _service.AddDispenserAndSaveToDataBase(dispenser);
         }
-        [Command("add")]
+        [Command("add"), RequireOwner]
         public async Task AddBinding(ulong messageId, string emojiText, IRole role)
         {
             Emoji emoji = new Emoji(emojiText);
-            var dispenser = _service.GuildDispensers[Context.Guild].FirstOrDefault(x => x.ListenedMessage.Id == messageId);
+            var dispenser = _service.GuildDispensers[Context.Guild.Id].FirstOrDefault(x => x.ListenedMessage.Id == messageId);
             if (dispenser != null)
             {
                 if (dispenser.TryAddNewBinding(emoji, role))
@@ -44,11 +44,11 @@ namespace NetCoreDiscordBot.Modules.Commands
                     await ReplyAsync("Уже есть такая реакция.");
             }
         }
-        [Command("remove")]
+        [Command("remove"), RequireOwner]
         public async Task RemoveBinding(ulong messageId, string emojiText)
         {
             Emoji emoji = new Emoji(emojiText);
-            var dispenser = _service.GuildDispensers[Context.Guild].FirstOrDefault(x => x.ListenedMessage.Id == messageId);
+            var dispenser = _service.GuildDispensers[Context.Guild.Id].FirstOrDefault(x => x.ListenedMessage.Id == messageId);
             if (dispenser != null)
             {
                 if (dispenser.TryRemoveBinding(emoji))
@@ -61,10 +61,10 @@ namespace NetCoreDiscordBot.Modules.Commands
             }
         }
 
-        [Command("delete")]
+        [Command("delete"), RequireOwner]
         public async Task DeleteDispenser(ulong messageId)
         {
-            var dispenser = _service.GuildDispensers[Context.Guild].FirstOrDefault(x => x.ListenedMessage?.Id == messageId);
+            var dispenser = _service.GuildDispensers[Context.Guild.Id].FirstOrDefault(x => x.ListenedMessage?.Id == messageId);
             if (dispenser != null)
             {
                 await _service.RemoveDispenser(dispenser);

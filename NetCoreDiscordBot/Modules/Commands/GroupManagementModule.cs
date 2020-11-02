@@ -14,7 +14,7 @@ namespace NetCoreDiscordBot.Modules.Commands
 {
     [Group("group")]
     [RequireContext(ContextType.Guild)]
-    public class GroupManagementModule : ModuleBase<ShardedCommandContext>
+    public class GroupManagementModule : ModuleBase<SocketCommandContext>
     {
         private readonly GroupHandlingService _groupService;
         public GroupManagementModule(GroupHandlingService groupService)
@@ -44,7 +44,7 @@ namespace NetCoreDiscordBot.Modules.Commands
         public async Task RemoveGroup(string groupGuid)
         {
             Guid guid = Guid.Parse(groupGuid);
-            var group = _groupService.GuildGroupLists[Context.Guild].FirstOrDefault(x => x.Guid == guid);
+            var group = _groupService.GuildGroupLists[Context.Guild.Id].FirstOrDefault(x => x.Guid == guid);
             if (group != null)
             {
                 await _groupService.RemoveGroup(group);
@@ -57,7 +57,7 @@ namespace NetCoreDiscordBot.Modules.Commands
         [Command("list all"), Summary("Lists all groups in this guild")]
         public async Task ListGroups()
         {
-            var groups = _groupService.GuildGroupLists[Context.Guild];
+            var groups = _groupService.GuildGroupLists[Context.Guild.Id];
             var message = "Current groups at this guild:\n";
             foreach (var group in groups)
             {
@@ -70,7 +70,7 @@ namespace NetCoreDiscordBot.Modules.Commands
         public async Task EditGroupDescription(string groupGuid, params string[] newDescription)
         {
             Guid guid = Guid.Parse(groupGuid);
-            var group = _groupService.GuildGroupLists[Context.Guild].FirstOrDefault(x => x.Guid == guid);
+            var group = _groupService.GuildGroupLists[Context.Guild.Id].FirstOrDefault(x => x.Guid == guid);
 
             if (group.Host.Id != Context.User.Id)
                 return;
@@ -88,7 +88,7 @@ namespace NetCoreDiscordBot.Modules.Commands
         [Command("get as"), Summary("Gets group-specific data")]
         public async Task GetGUIDFromID(string type, ulong id)
         {
-            var group = _groupService.GuildGroupLists[Context.Guild].FirstOrDefault(x => x.PresentationMessage.Id == id);
+            var group = _groupService.GuildGroupLists[Context.Guild.Id].FirstOrDefault(x => x.PresentationMessage.Id == id);
             string reply = string.Empty;
             switch (type.ToUpper())
             {
@@ -106,7 +106,7 @@ namespace NetCoreDiscordBot.Modules.Commands
         public async Task AddUserList(string groupGuid, string emoji, int? amount, params string[] description)
         {
             Guid guid = Guid.Parse(groupGuid);
-            var group = _groupService.GuildGroupLists[Context.Guild].FirstOrDefault(x => x.Guid == guid);
+            var group = _groupService.GuildGroupLists[Context.Guild.Id].FirstOrDefault(x => x.Guid == guid);
 
             if (group.Host.Id != Context.User.Id)
                 return;
@@ -137,7 +137,7 @@ namespace NetCoreDiscordBot.Modules.Commands
         public async Task RemoveUserList(string groupGuid, string emoji)
         {
             Guid guid = Guid.Parse(groupGuid);
-            var group = _groupService.GuildGroupLists[Context.Guild].FirstOrDefault(x => x.Guid == guid);
+            var group = _groupService.GuildGroupLists[Context.Guild.Id].FirstOrDefault(x => x.Guid == guid);
 
             if (group.Host.Id != Context.User.Id)
                 return;

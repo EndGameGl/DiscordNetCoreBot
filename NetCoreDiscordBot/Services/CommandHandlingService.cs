@@ -11,14 +11,14 @@ namespace NetCoreDiscordBot.Services
     public class CommandHandlingService
     {
         public readonly CommandService Commands;
-        private readonly DiscordShardedClient _discordClient;
+        private readonly DiscordSocketClient _discordClient;
         private readonly IServiceProvider _services;
         private readonly GuildDataExtensionsService _dataExtensionsService;
 
         public CommandHandlingService(IServiceProvider services)
         {
             Commands = services.GetRequiredService<CommandService>();
-            _discordClient = services.GetRequiredService<DiscordShardedClient>();
+            _discordClient = services.GetRequiredService<DiscordSocketClient>();
             _services = services;
 
             Commands.CommandExecuted += CommandExecutedAsync;
@@ -38,7 +38,7 @@ namespace NetCoreDiscordBot.Services
             var argPos = 0;
             if (!message.HasCharPrefix('_', ref argPos))
                 return;
-            var context = new ShardedCommandContext(_discordClient, message);
+            var context = new SocketCommandContext(_discordClient, message);
             await Commands.ExecuteAsync(context, argPos, _services);
         }
         public async Task CommandExecutedAsync(Optional<CommandInfo> command, ICommandContext context, IResult result)

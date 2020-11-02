@@ -36,32 +36,38 @@ namespace NetCoreDiscordBot
             {
                 LogLevel = LogSeverity.Info,
                 MessageCacheSize = 10,
-                TotalShards = 1,
+                AlwaysDownloadUsers = true
             };
 
             using (var services = ConfigureServices(config))
             {
-                var _discordShardedClient = services.GetRequiredService<DiscordShardedClient>();
+                var _discordsocketClient = services.GetRequiredService<DiscordSocketClient>();
                 string token = args[0];
 
-                _discordShardedClient.ShardReady += ShardReadyAsync;
-                _discordShardedClient.ShardReady += async (shard) =>
+                _discordsocketClient.Ready += ReadyAsync;               
+                _discordsocketClient.Log += LogAsync;
+
+                await services.GetRequiredService<CommandHandlingService>().InitializeAsync();
+                services.GetRequiredService<ReactionHandlingService>();
+
+                _discordsocketClient.Ready += async () =>
                 {
+                    foreach (var guild in _discordsocketClient.Guilds)
+                    {
+                        await guild.DownloadUsersAsync();
+                        Console.WriteLine($"{guild.Users.Count} users loaded for {guild.Name}");
+                    }
                     await services.GetRequiredService<GuildDataExtensionsService>().InitializeAsync();
                     await services.GetRequiredService<GroupHandlingService>().InitializeAsync();
                     await services.GetRequiredService<GroupHandlingService>().LoadAllGroups();
                     await services.GetRequiredService<RoleDispenserService>().InitializeAsync();
                     await services.GetRequiredService<RoleDispenserService>().LoadAllDispensers();
+                    Console.WriteLine("Bot ready.");
                 };
-                _discordShardedClient.Log += LogAsync;
-
-                await services.GetRequiredService<CommandHandlingService>().InitializeAsync();
-                services.GetRequiredService<ReactionHandlingService>();
-
-
-                await _discordShardedClient.LoginAsync(TokenType.Bot, token);
-                await _discordShardedClient.StartAsync();
-             
+                
+                await _discordsocketClient.LoginAsync(TokenType.Bot, token);
+                await _discordsocketClient.StartAsync();
+                
                 await Task.Delay(Timeout.Infinite);
             }          
         }
@@ -78,7 +84,7 @@ namespace NetCoreDiscordBot
             serviceProvider.AddDbContext<GroupsContext>(options => options.UseSqlServer(Configuration.GetConnectionString("DefaultConnectionGroups")));
             serviceProvider.AddDbContext<GuildDataExtensionsContext>(options => options.UseSqlServer(Configuration.GetConnectionString("DefaultConnectionExtensions")));
             serviceProvider.AddDbContext<RoleDispensersContext>(options => options.UseSqlServer(Configuration.GetConnectionString("DefaultConnectionDispensers")));
-            serviceProvider.AddSingleton(new DiscordShardedClient(config));
+            serviceProvider.AddSingleton(new DiscordSocketClient(config));
             serviceProvider.AddSingleton<CommandService>();      
             serviceProvider.AddSingleton<CommandHandlingService>();
             serviceProvider.AddSingleton<ReactionHandlingService>();
@@ -89,12 +95,11 @@ namespace NetCoreDiscordBot
 
             return serviceProvider.BuildServiceProvider();
         }
-        private static Task ShardReadyAsync(DiscordSocketClient shard)
+        private static Task ReadyAsync()
         {
-            Console.WriteLine($"Shard Number {shard.ShardId} is connected and ready!");
+            Console.WriteLine($"Ready!");
             return Task.CompletedTask;
         }
-
         private static Task LogAsync(LogMessage log)
         {
             Console.WriteLine(log.ToString());

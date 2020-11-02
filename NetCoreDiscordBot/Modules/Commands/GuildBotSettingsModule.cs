@@ -9,7 +9,7 @@ namespace NetCoreDiscordBot.Modules.Commands
 {
     [Group("settings")]
     [RequireContext(ContextType.Guild)]
-    public class GuildBotSettingsModule : ModuleBase<ShardedCommandContext>
+    public class GuildBotSettingsModule : ModuleBase<SocketCommandContext>
     {
         private GuildDataExtensionsService _guildDataExtensionsService { get; }
         public GuildBotSettingsModule(GuildDataExtensionsService guildDataExtensionsService)
