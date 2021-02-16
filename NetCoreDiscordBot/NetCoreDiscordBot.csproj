@@ -6,28 +6,44 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Discord.Net" Version="2.2.0" />
+    <None Remove="CustomServices\DecoderPuzzle\Models\Locks\HardPuzzleLockPreset.cs~RFd73af02.TMP" />
+    <None Remove="CustomServices\DecoderPuzzle\Models\Locks\HardPuzzleLockPreset.cs~RFedeae60.TMP" />
+    <None Remove="CustomServices\DecoderPuzzle\Models\PuzzleHost.cs~RFdde6398.TMP" />
+    <None Remove="CustomServices\DecoderPuzzle\Models\PuzzleHost.cs~RFe645bbd.TMP" />
+    <None Remove="CustomServices\DecoderPuzzle\Models\PuzzleHost.cs~RFf731807.TMP" />
+    <None Remove="CustomServices\DecoderPuzzle\Modules\PuzzleCommandModule.cs~RFdec64bd.TMP" />
+    <None Remove="CustomServices\DecoderPuzzle\Modules\PuzzleCommandModule.cs~RFdf234d6.TMP" />
+    <None Remove="Modules\Commands\UtilitiesModule.cs~RF59914bc7.TMP" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Discord.Net" Version="2.3.0" />
     <PackageReference Include="Microsoft.AspNetCore.App" Version="2.2.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="3.1.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="3.1.8" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="BungieAPI">
-      <HintPath>F:\Programming Stuff\Projects\BungieAPI\Repository\BungieAPI\bin\Debug\BungieAPI.dll</HintPath>
-    </Reference>
+    <PackageReference Include="System.Data.SQLite" Version="1.0.113.7" />
+    <PackageReference Include="System.Drawing.Common" Version="5.0.1" />
+    <PackageReference Include="Unity" Version="5.11.10" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="BungieConfig.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Preconditions\" />
-    <Folder Include="TypeReaders\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="BungieNetCoreAPI">
+      <HintPath>..\..\..\..\BungieNetCoreAPIRepository\BungieNetCoreAPI\BungieNetCoreAPI\bin\Debug\netcoreapp3.1\BungieNetCoreAPI.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
 </Project>

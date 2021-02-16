@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Hosting;
-using NetCoreDiscordBot.Models;
 using NetCoreDiscordBot.Services;
 using System;
 using System.IO;
@@ -15,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using NetCoreDiscordBot.Models.Groups;
 using NetCoreDiscordBot.Models.Guilds;
 using NetCoreDiscordBot.Models.Dispensers;
+using NetCoreDiscordBot.CustomServices.DecoderPuzzle.Services;
 
 namespace NetCoreDiscordBot
 {
@@ -62,6 +62,10 @@ namespace NetCoreDiscordBot
                     await services.GetRequiredService<GroupHandlingService>().LoadAllGroups();
                     await services.GetRequiredService<RoleDispenserService>().InitializeAsync();
                     await services.GetRequiredService<RoleDispenserService>().LoadAllDispensers();
+                    services.GetRequiredService<LockPuzzleService>().Init();
+                    services.GetRequiredService<BungieService>().Client.LogListener.OnNewMessage += LogFromBungieAsync;
+                    await services.GetRequiredService<BungieService>().Client.Run();
+
                     Console.WriteLine("Bot ready.");
                 };
                 
@@ -91,7 +95,8 @@ namespace NetCoreDiscordBot
             serviceProvider.AddSingleton<GuildDataExtensionsService>();
             serviceProvider.AddSingleton<GroupHandlingService>();
             serviceProvider.AddSingleton<RoleDispenserService>();
-            serviceProvider.AddSingleton<BungieAPIService>();
+            serviceProvider.AddSingleton<LockPuzzleService>();
+            serviceProvider.AddSingleton<BungieService>();
 
             return serviceProvider.BuildServiceProvider();
         }
@@ -104,6 +109,11 @@ namespace NetCoreDiscordBot
         {
             Console.WriteLine(log.ToString());
             return Task.CompletedTask;
+        }
+
+        private static void LogFromBungieAsync(BungieNetCoreAPI.Logging.LogMessage logMessage)
+        {
+            Console.WriteLine(logMessage.ToString());
         }
     }
 }

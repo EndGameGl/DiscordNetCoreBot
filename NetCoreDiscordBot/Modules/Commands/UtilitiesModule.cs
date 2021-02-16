@@ -14,8 +14,8 @@ namespace NetCoreDiscordBot.Modules.Commands
         [Command("clear"), RequireOwner]
         public async Task ClearMessagesRange(int amount)
         {
-            var messages = Context.Channel.GetMessagesAsync(amount + 1, CacheMode.AllowDownload).Flatten();
-            foreach (var mes in messages.ToEnumerable())
+            var messages = await Context.Channel.GetMessagesAsync(amount + 1, CacheMode.AllowDownload).FlattenAsync();
+            foreach (var mes in messages)
             {
                 if ((DateTime.Now - mes.CreatedAt.Date).Days > 14)
                 {
@@ -23,7 +23,7 @@ namespace NetCoreDiscordBot.Modules.Commands
                     return;
                 }
             }
-            await ((SocketTextChannel)Context.Channel).DeleteMessagesAsync(messages.ToEnumerable());
+            await ((SocketTextChannel)Context.Channel).DeleteMessagesAsync(messages);
             await ReplyAsync($"Deleted {amount} messages");
         }
     }

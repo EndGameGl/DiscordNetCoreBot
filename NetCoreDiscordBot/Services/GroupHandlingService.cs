@@ -59,15 +59,28 @@ namespace NetCoreDiscordBot.Services
                 var references = await dataBase.GetGroupReferences(guild.Id);
                 foreach (var reference in references)
                 {
-                    GuildGroupLists[guild.Id].Add(await LoadGroupFromReference(reference));
+                    try
+                    {
+                        GuildGroupLists[guild.Id].Add(await LoadGroupFromReference(reference));
+                    }
+                    catch
+                    {
+                        dataBase.Remove(reference);
+                    }
                 }
             }
         }
         private async Task<Group> LoadGroupFromReference(GroupReference groupReference)
         {
             var guild = _discordClient.GetGuild(groupReference.GuildId);
+            if (guild == null)
+                throw new Exception("Missing guild.");
             var host = guild.GetUser(groupReference.HostId);
+            if (host == null)
+                throw new Exception("Missing host user.");
             var channel = guild.GetTextChannel(groupReference.ChannelId);
+            if (channel == null)
+                throw new Exception("Missing channel.");
             RestUserMessage message = null;
             if (groupReference.MessageId.HasValue)
             {

@@ -29,7 +29,6 @@ namespace NetCoreDiscordBot.Models.Groups
             } 
             private set { } 
         }
-
         public GroupUserList(string description, IEmote joinEmote, int? userLimit = null)
         {
             Description = description;

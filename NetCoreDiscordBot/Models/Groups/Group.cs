@@ -20,6 +20,8 @@ namespace NetCoreDiscordBot.Models.Groups
         public DateTime CreatedAt { get; set; }
         public string Description { get; set; }
         public GroupType Type { get; set; }
+
+        public bool IsFull => UserLists.TrueForAll(x => !x.HasPlaceForNewUsers);
         public Group(SocketGuild guild, SocketGuildUser host, SocketTextChannel channel, List<GroupUserList> userLists, string description, GroupType type)
         {
             Guid = Guid.NewGuid();
