@@ -3,6 +3,7 @@ using Discord.Commands;
 using Discord.WebSocket;
 using NetCoreDiscordBot.Models.Dispensers;
 using NetCoreDiscordBot.Services;
+using NetCoreDiscordBot.Services.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,8 +16,8 @@ namespace NetCoreDiscordBot.Modules.Commands
     [RequireContext(ContextType.Guild)]
     public class DispenserManagementModule : ModuleBase<SocketCommandContext>
     {
-        private RoleDispenserService _service { get; set; }
-        public DispenserManagementModule(RoleDispenserService service)
+        private IRoleDispenserService _service { get; set; }
+        public DispenserManagementModule(IRoleDispenserService service)
         {
             _service = service;
         }
@@ -25,49 +26,40 @@ namespace NetCoreDiscordBot.Modules.Commands
         public async Task CreateDispenser(params string[] description)
         {
             RoleDispenser dispenser = new RoleDispenser(Context.Guild, (SocketTextChannel)Context.Channel, string.Join(' ', description));
+            await _service.AddRoleDispenser(dispenser);
             await dispenser.SendMessage();
-            await _service.AddDispenserAndSaveToDataBase(dispenser);
         }
         [Command("add"), RequireOwner]
         public async Task AddBinding(ulong messageId, string emojiText, IRole role)
         {
             Emoji emoji = new Emoji(emojiText);
-            var dispenser = _service.GuildDispensers[Context.Guild.Id].FirstOrDefault(x => x.ListenedMessage.Id == messageId);
-            if (dispenser != null)
+            if (_service.TryGetRoleDispenser(Context.Guild.Id, messageId, out var dispenser))
             {
-                if (dispenser.TryAddNewBinding(emoji, role))
-                {
-                    await _service.UpdateDispenser(dispenser);
-                    await dispenser.ListenedMessage.AddReactionAsync(emoji);
-                }
-                else
-                    await ReplyAsync("Уже есть такая реакция.");
+                await _service.ReplaceWithNewerRoleDispenser(dispenser);
+                await dispenser.ListenedMessage.AddReactionAsync(emoji);
             }
+            else
+                await ReplyAsync("Уже есть такая реакция.");
         }
         [Command("remove"), RequireOwner]
         public async Task RemoveBinding(ulong messageId, string emojiText)
         {
             Emoji emoji = new Emoji(emojiText);
-            var dispenser = _service.GuildDispensers[Context.Guild.Id].FirstOrDefault(x => x.ListenedMessage.Id == messageId);
-            if (dispenser != null)
+            if (_service.TryGetRoleDispenser(Context.Guild.Id, messageId, out var dispenser))
             {
-                if (dispenser.TryRemoveBinding(emoji))
-                {
-                    await _service.UpdateDispenser(dispenser);
-                    await dispenser.ListenedMessage.RemoveReactionAsync(emoji, Context.Client.CurrentUser);
-                }
-                else
-                    await ReplyAsync("Такой привязки нет.");
+                await _service.ReplaceWithNewerRoleDispenser(dispenser);
+                await dispenser.ListenedMessage.RemoveReactionAsync(emoji, Context.Client.CurrentUser);
             }
+            else
+                await ReplyAsync("Такой привязки нет.");
         }
 
         [Command("delete"), RequireOwner]
         public async Task DeleteDispenser(ulong messageId)
         {
-            var dispenser = _service.GuildDispensers[Context.Guild.Id].FirstOrDefault(x => x.ListenedMessage?.Id == messageId);
-            if (dispenser != null)
+            if (_service.TryGetRoleDispenser(Context.Guild.Id, messageId, out var dispenser))
             {
-                await _service.RemoveDispenser(dispenser);
+                await _service.RemoveRoleDispenser(dispenser);
                 await dispenser.ListenedMessage.DeleteAsync();
             }
         }

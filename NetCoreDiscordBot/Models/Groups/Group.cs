@@ -1,6 +1,7 @@
 ﻿using Discord;
 using Discord.Rest;
 using Discord.WebSocket;
+using MongoDB.Bson.Serialization.Attributes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -59,12 +60,12 @@ namespace NetCoreDiscordBot.Models.Groups
             }
             return messageBuilder.ToString();
         }
-        public async Task SendMessage()
+        public async Task SendMessage(string callEmoji, string closeEmoji)
         {
             PresentationMessage = await Channel.SendMessageAsync(GetMessageText());
             var emojis = UserLists.Select(x => x.JoinEmote).ToList();
-            emojis.Add(new Emoji(Core.Configuration["Emojis:DefaultCallEmoji"]));
-            emojis.Add(new Emoji(Core.Configuration["Emojis:DefaultCloseEmoji"]));
+            emojis.Add(new Emoji(callEmoji));
+            emojis.Add(new Emoji(closeEmoji));
             await PresentationMessage.AddReactionsAsync(emojis.ToArray());
         }
         public async Task UpdateMessage()

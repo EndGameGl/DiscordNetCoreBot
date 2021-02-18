@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MongoDB.Bson.Serialization.Attributes;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
@@ -6,7 +7,8 @@ namespace NetCoreDiscordBot.Models.Groups.References
 {
     public class GroupReference
     {
-        [Key]
+        [BsonId]
+        public int _id;
         public Guid GUID { get; set; }
         public ulong HostId { get; set; }
         public ulong GuildId { get; set; }

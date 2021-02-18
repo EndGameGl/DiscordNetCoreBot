@@ -9,7 +9,6 @@ using System.Linq;
 
 namespace NetCoreDiscordBot.Models.Groups
 {
-    [Owned]
     public class GroupUserList
     {
         public string Description { get; set; }

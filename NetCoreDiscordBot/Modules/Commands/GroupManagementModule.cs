@@ -3,7 +3,7 @@ using Discord.Commands;
 using Discord.WebSocket;
 using NetCoreDiscordBot.Models.Groups;
 using NetCoreDiscordBot.Models.Groups.References;
-using NetCoreDiscordBot.Services;
+using NetCoreDiscordBot.Services.Interfaces;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -16,10 +16,12 @@ namespace NetCoreDiscordBot.Modules.Commands
     [RequireContext(ContextType.Guild)]
     public class GroupManagementModule : ModuleBase<SocketCommandContext>
     {
-        private readonly GroupHandlingService _groupService;
-        public GroupManagementModule(GroupHandlingService groupService)
+        private readonly IConfigurationService _config;
+        private readonly IGroupHandlerService _groupService;
+        public GroupManagementModule(IGroupHandlerService groupService, IConfigurationService config)
         {
             _groupService = groupService;
+            _config = config;
         }
 
         [Command("create"), Summary("Creates new group with given number of slots.")]
@@ -31,21 +33,22 @@ namespace NetCoreDiscordBot.Modules.Commands
                     channel: (SocketTextChannel)Context.Channel,
                     userLists: new List<GroupUserList>()
                     {
-                        new GroupUserList("Group members", new Emoji(Core.Configuration["Emojis:DefaultJoinEmoji"]), numberOfSlots)
+                        new GroupUserList(
+                            description: "Group members",
+                            joinEmote: new Emoji(_config.Configuration["Emojis:DefaultJoinEmoji"]),
+                            userLimit: numberOfSlots)
                     },
                     description: string.Join(' ', description),
-                    type: GroupType.Simple
-                    );
-            await group.SendMessage();
-            await _groupService.AddGroupAndSaveToDataBase(group);
+                    type: GroupType.Simple);
+            await group.SendMessage(_config.Configuration["Emojis:DefaultCallEmoji"], _config.Configuration["Emojis:DefaultCloseEmoji"]);
+            await _groupService.AddGroup(group);
         }
 
         [Command("remove"), Summary("Removes group with specified GUID"), RequireOwner]
         public async Task RemoveGroup(string groupGuid)
         {
             Guid guid = Guid.Parse(groupGuid);
-            var group = _groupService.GuildGroupLists[Context.Guild.Id].FirstOrDefault(x => x.Guid == guid);
-            if (group != null)
+            if (_groupService.TryGetGroup(Context.Guild.Id, guid, out var group))
             {
                 await _groupService.RemoveGroup(group);
                 await ReplyAsync("Group was removed successfully");
@@ -57,28 +60,28 @@ namespace NetCoreDiscordBot.Modules.Commands
         [Command("list all"), Summary("Lists all groups in this guild")]
         public async Task ListGroups()
         {
-            var groups = _groupService.GuildGroupLists[Context.Guild.Id];
-            var message = "Current groups at this guild:\n";
-            foreach (var group in groups)
+            if (_groupService.TryGetGuildGroups(Context.Guild.Id, out var groups))
             {
-                message += $"{group.ToString()}\n";
+                var message = "Current groups at this guild:\n";
+                foreach (var group in groups)
+                {
+                    message += $"{group.ToString()}\n";
+                }
+                await ReplyAsync($"{message}");
             }
-            await ReplyAsync($"{message}");
         }
 
         [Command("edit descr"), Summary("Edits description of group")]
         public async Task EditGroupDescription(string groupGuid, params string[] newDescription)
         {
             Guid guid = Guid.Parse(groupGuid);
-            var group = _groupService.GuildGroupLists[Context.Guild.Id].FirstOrDefault(x => x.Guid == guid);
-
-            if (group.Host.Id != Context.User.Id)
-                return;
-
-            if (group != null)
+            if (_groupService.TryGetGroup(Context.Guild.Id, guid, out var group))
             {
+                if (group.Host.Id != Context.User.Id)
+                    return;
+
                 group.Description = (newDescription.Length > 0) ? (string.Join(' ', newDescription)) : string.Empty;
-                await _groupService.UpdateGroup(group);
+                await _groupService.ReplaceWithNewerGroup(group);
                 await ReplyAsync("Group description was updated!");
             }
             else
@@ -88,31 +91,27 @@ namespace NetCoreDiscordBot.Modules.Commands
         [Command("get as"), Summary("Gets group-specific data")]
         public async Task GetGUIDFromID(string type, ulong id)
         {
-            var group = _groupService.GuildGroupLists[Context.Guild.Id].FirstOrDefault(x => x.PresentationMessage.Id == id);
-            string reply = string.Empty;
-            switch (type.ToUpper())
+            if (_groupService.TryGetGroup(Context.Guild.Id, id, out var group))
             {
-                case "GUID":
-                    reply = group.Guid.ToString();
-                    break;
-                case "JSON":
-                    reply = $"```{JsonConvert.SerializeObject(new GroupReference(group), Formatting.Indented)}```";
-                    break;
+                string reply = (type.ToUpper()) switch
+                {
+                    "GUID" => group.Guid.ToString(),
+                    "JSON" => $"```{JsonConvert.SerializeObject(new GroupReference(group), Formatting.Indented)}```",
+                    _ => "Wrong type. Should be \"GUID\" or \"JSON\"",
+                };
+                await ReplyAsync(reply);
             }
-            await ReplyAsync(reply);
         }
 
         [Command("add choice"), Summary("Adds new join choice for group")]
         public async Task AddUserList(string groupGuid, string emoji, int? amount, params string[] description)
         {
             Guid guid = Guid.Parse(groupGuid);
-            var group = _groupService.GuildGroupLists[Context.Guild.Id].FirstOrDefault(x => x.Guid == guid);
-
-            if (group.Host.Id != Context.User.Id)
-                return;
-
-            if (group != null)
+            if (_groupService.TryGetGroup(Context.Guild.Id, guid, out var group))
             {
+                if (group.Host.Id != Context.User.Id)
+                    return;
+
                 if (!group.UserLists.Any(x => x.JoinEmote.Name == emoji))
                 {
                     var newList = new GroupUserList()
@@ -123,7 +122,7 @@ namespace NetCoreDiscordBot.Modules.Commands
                         Description = (description.Length > 0) ? string.Join(' ', description) : string.Empty
                     };
                     group.UserLists.Add(newList);
-                    await _groupService.UpdateGroup(group);
+                    await _groupService.ReplaceWithNewerGroup(group);
                     await group.PresentationMessage.AddReactionAsync(newList.JoinEmote);
                 }
                 else
@@ -137,16 +136,16 @@ namespace NetCoreDiscordBot.Modules.Commands
         public async Task RemoveUserList(string groupGuid, string emoji)
         {
             Guid guid = Guid.Parse(groupGuid);
-            var group = _groupService.GuildGroupLists[Context.Guild.Id].FirstOrDefault(x => x.Guid == guid);
 
-            if (group.Host.Id != Context.User.Id)
-                return;
-
-            if (group != null)
+            if (_groupService.TryGetGroup(Context.Guild.Id, guid, out var group))
             {
+
+                if (group.Host.Id != Context.User.Id)
+                    return;
+
                 var userList = group.UserLists.FirstOrDefault(x => x.JoinEmote.Name == emoji);
                 group.UserLists.Remove(userList);
-                await _groupService.UpdateGroup(group);
+                await _groupService.ReplaceWithNewerGroup(group);
             }
             else
                 await ReplyAsync("No groups with such ID were found");

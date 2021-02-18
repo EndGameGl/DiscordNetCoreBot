@@ -1,6 +1,7 @@
 ﻿using Discord;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
+using NetCoreDiscordBot.Services.Interfaces;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,18 +10,18 @@ namespace NetCoreDiscordBot.Services
 {
     public class ReactionHandlingService
     {
-        private readonly GuildDataExtensionsService _dataExtensionsService;
-        private readonly DiscordSocketClient _discordClient; 
-        private readonly IServiceProvider _services;
-        private readonly GroupHandlingService _groupHandlingService;
-        private readonly RoleDispenserService _roleDispenserService;
+        private readonly IGuildDataExtensionsService _dataExtensionsService;
+        private readonly DiscordSocketClient _discordClient;
+        private readonly IConfigurationService _config;
+        private readonly IGroupHandlerService _groupHandlingService;
+        private readonly IRoleDispenserService _roleDispenserService;
         public ReactionHandlingService(IServiceProvider services)
         {
             _discordClient = services.GetRequiredService<DiscordSocketClient>();
-            _services = services;
-            _groupHandlingService = services.GetRequiredService<GroupHandlingService>();
-            _roleDispenserService = services.GetRequiredService<RoleDispenserService>();
-            _dataExtensionsService = services.GetRequiredService<GuildDataExtensionsService>();
+            _groupHandlingService = services.GetRequiredService<IGroupHandlerService>();
+            _roleDispenserService = services.GetRequiredService<IRoleDispenserService>();
+            _dataExtensionsService = services.GetRequiredService<IGuildDataExtensionsService>();
+            _config = services.GetRequiredService<IConfigurationService>();
 
             _discordClient.ReactionAdded += ReactionAddedHandler;
             _discordClient.ReactionRemoved += ReactionRemovedHandler;
@@ -32,53 +33,43 @@ namespace NetCoreDiscordBot.Services
             {
                 if (channel is SocketGuildChannel guildChannel)
                 {
-                    if (_groupHandlingService.IsGroup(guildChannel.Guild, reaction.MessageId))
+                    if (_groupHandlingService.TryGetGroup(guildChannel.Guild.Id, reaction.MessageId, out var connectedGroup))
                     {
-                        var connectedGroup = _groupHandlingService.GuildGroupLists[guildChannel.Guild.Id].FirstOrDefault(x => x.PresentationMessage.Id == reaction.MessageId);
-                        if (connectedGroup != null)
+                        if (reaction.Emote.Name == _config.Configuration["Emojis:DefaultCloseEmoji"])
                         {
-
-                            if (reaction.Emote.Name == Core.Configuration["Emojis:DefaultCloseEmoji"])
+                            if (reaction.UserId == connectedGroup.Host.Id || _dataExtensionsService.IsAdmin(connectedGroup.Guild.Id, reaction.UserId))
                             {
-                                if (reaction.UserId == connectedGroup.Host.Id || _dataExtensionsService.CheckIfAdmin(connectedGroup.Guild.Id, reaction.UserId))
-                                {
-                                    await connectedGroup.CloseMessage();
-                                    await _groupHandlingService.RemoveGroup(connectedGroup);
-                                }
+                                await connectedGroup.CloseMessage();
+                                await _groupHandlingService.RemoveGroup(connectedGroup);
                             }
-                            else if (reaction.Emote.Name == Core.Configuration["Emojis:DefaultCallEmoji"])
+                        }
+                        else if (reaction.Emote.Name == _config.Configuration["Emojis:DefaultCallEmoji"])
+                        {
+                            if (reaction.UserId == connectedGroup.Host.Id || _dataExtensionsService.IsAdmin(connectedGroup.Guild.Id, reaction.UserId))
                             {
-                                if (reaction.UserId == connectedGroup.Host.Id || _dataExtensionsService.CheckIfAdmin(connectedGroup.Guild.Id, reaction.UserId))
-                                {
-                                    await connectedGroup.SendAnnouncement(guildChannel.Guild.GetUser(reaction.UserId));
-                                }
+                                await connectedGroup.SendAnnouncement(guildChannel.Guild.GetUser(reaction.UserId));
                             }
-                            
-                            else
+                        }
+                        else
+                        {
+                            var userList = connectedGroup.UserLists.FirstOrDefault(x => x.JoinEmote.Name == reaction.Emote.Name);
+                            if (userList != null)
                             {
-                                var userList = connectedGroup.UserLists.FirstOrDefault(x => x.JoinEmote.Name == reaction.Emote.Name);
-                                if (userList != null)
+                                var user = guildChannel.GetUser(reaction.UserId);
+                                if (userList.TryJoinList(user))
                                 {
-                                    var user = guildChannel.GetUser(reaction.UserId);
-                                    if (userList.TryJoinList(user))
-                                    {
-                                        await _groupHandlingService.UpdateGroup(connectedGroup);
-                                    }
-                                    else
-                                        await connectedGroup.PresentationMessage.RemoveReactionAsync(reaction.Emote, user);
+                                    await _groupHandlingService.ReplaceWithNewerGroup(connectedGroup);
                                 }
+                                else
+                                    await connectedGroup.PresentationMessage.RemoveReactionAsync(reaction.Emote, user);
                             }
                         }
                     }
-                    else if (_roleDispenserService.IsDispenser(guildChannel.Guild, reaction.MessageId))
+                    else if (_roleDispenserService.TryGetRoleDispenser(guildChannel.Guild.Id, reaction.MessageId, out var connectedDispenser))
                     {
-                        var connectedDispenser = _roleDispenserService.GuildDispensers[guildChannel.Guild.Id].FirstOrDefault(x => x.ListenedMessage.Id == reaction.MessageId);
-                        if (connectedDispenser != null)
+                        if (connectedDispenser.EmoteToRoleBindings.TryGetValue(reaction.Emote, out var role))
                         {
-                            if (connectedDispenser.EmoteToRoleBindings.TryGetValue(reaction.Emote, out var role))
-                            {
-                                await guildChannel.Guild.GetUser(reaction.UserId).AddRoleAsync(role);
-                            }
+                            await guildChannel.Guild.GetUser(reaction.UserId).AddRoleAsync(role);
                         }
                     }
                 }
@@ -90,29 +81,24 @@ namespace NetCoreDiscordBot.Services
             {
                 if (channel is SocketGuildChannel guildChannel)
                 {
-                    if (_groupHandlingService.IsGroup(guildChannel.Guild, reaction.MessageId))
+                    if (_groupHandlingService.TryGetGroup(guildChannel.Guild.Id, reaction.MessageId, out var connectedGroup))
                     {
-                        if (reaction.Emote.Name != Core.Configuration["Emojis:DefaultCallEmoji"] && reaction.Emote.Name != Core.Configuration["Emojis:DefaultCloseEmoji"])
+                        if (reaction.Emote.Name != _config.Configuration["Emojis:DefaultCallEmoji"] && reaction.Emote.Name != _config.Configuration["Emojis:DefaultCloseEmoji"])
                         {
-                            var connectedGroup = _groupHandlingService.GuildGroupLists[guildChannel.Guild.Id].FirstOrDefault(x => x.PresentationMessage.Id == reaction.MessageId);
                             var userList = connectedGroup.UserLists.FirstOrDefault(x => x.JoinEmote.Name == reaction.Emote.Name);
                             if (userList != null)
                             {
                                 var userToRemove = userList.Users.FirstOrDefault(x => x.Id == reaction.UserId);
                                 userList.Users.Remove(userToRemove);
-                                await _groupHandlingService.UpdateGroup(connectedGroup);
+                                await _groupHandlingService.ReplaceWithNewerGroup(connectedGroup);
                             }
                         }
                     }
-                    else if (_roleDispenserService.IsDispenser(guildChannel.Guild, reaction.MessageId))
+                    else if (_roleDispenserService.TryGetRoleDispenser(guildChannel.Guild.Id, reaction.MessageId, out var connectedDispenser))
                     {
-                        var connectedDispenser = _roleDispenserService.GuildDispensers[guildChannel.Guild.Id].FirstOrDefault(x => x.ListenedMessage.Id == reaction.MessageId);
-                        if (connectedDispenser != null)
+                        if (connectedDispenser.EmoteToRoleBindings.TryGetValue(reaction.Emote, out var role))
                         {
-                            if (connectedDispenser.EmoteToRoleBindings.TryGetValue(reaction.Emote, out var role))
-                            {
-                                await guildChannel.Guild.GetUser(reaction.UserId).RemoveRoleAsync(role);
-                            }
+                            await guildChannel.Guild.GetUser(reaction.UserId).RemoveRoleAsync(role);
                         }
                     }
                 }

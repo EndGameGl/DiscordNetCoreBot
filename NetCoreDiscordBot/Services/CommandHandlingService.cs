@@ -13,7 +13,7 @@ namespace NetCoreDiscordBot.Services
         public readonly CommandService Commands;
         private readonly DiscordSocketClient _discordClient;
         private readonly IServiceProvider _services;
-        private readonly GuildDataExtensionsService _dataExtensionsService;
+        //private readonly GuildDataExtensionsService _dataExtensionsService;
 
         public CommandHandlingService(IServiceProvider services)
         {
@@ -29,7 +29,7 @@ namespace NetCoreDiscordBot.Services
         {
             await Commands.AddModulesAsync(Assembly.GetEntryAssembly(), _services);
         }
-        public async Task MessageReceivedAsync(SocketMessage rawMessage)
+        private async Task MessageReceivedAsync(SocketMessage rawMessage)
         {
             if (!(rawMessage is SocketUserMessage message))
                 return;
@@ -41,7 +41,7 @@ namespace NetCoreDiscordBot.Services
             var context = new SocketCommandContext(_discordClient, message);
             await Commands.ExecuteAsync(context, argPos, _services);
         }
-        public async Task CommandExecutedAsync(Optional<CommandInfo> command, ICommandContext context, IResult result)
+        private async Task CommandExecutedAsync(Optional<CommandInfo> command, ICommandContext context, IResult result)
         {
             if (!command.IsSpecified)
                 return;

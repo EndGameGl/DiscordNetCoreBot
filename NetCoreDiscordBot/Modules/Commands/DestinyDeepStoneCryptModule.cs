@@ -1,6 +1,7 @@
 ﻿using Discord;
 using Discord.Commands;
 using NetCoreDiscordBot.Services;
+using NetCoreDiscordBot.Services.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,8 +13,8 @@ namespace NetCoreDiscordBot.Modules.Commands
     [Group("dsc")]
     public class DestinyDeepStoneCryptModule : ModuleBase<SocketCommandContext>
     {
-        private readonly GroupHandlingService _groupService;
-        public DestinyDeepStoneCryptModule(GroupHandlingService groupService)
+        private readonly IGroupHandlerService _groupService;
+        public DestinyDeepStoneCryptModule(IGroupHandlerService groupService)
         {
             _groupService = groupService;
         }
@@ -21,9 +22,8 @@ namespace NetCoreDiscordBot.Modules.Commands
         [Command("roles 4")]
         public async Task AssignRolesStageFour(ulong groupMessageId)
         {
-            if (_groupService.GuildGroupLists.TryGetValue(Context.Guild.Id, out var groups))
+            if (_groupService.TryGetGroup(Context.Guild.Id, groupMessageId, out var group))
             {
-                var group = groups.FirstOrDefault(x => x.PresentationMessage.Id == groupMessageId);
                 if (group.UserLists.Count == 1 && group.UserLists.First().UserLimit == 6 && group.IsFull)
                 {
                     var users = group.UserLists.First();
@@ -40,9 +40,8 @@ namespace NetCoreDiscordBot.Modules.Commands
         [Command("roles 3")]
         public async Task AssignRolesStageThree(ulong groupMessageId)
         {
-            if (_groupService.GuildGroupLists.TryGetValue(Context.Guild.Id, out var groups))
+            if (_groupService.TryGetGroup(Context.Guild.Id, groupMessageId, out var group))
             {
-                var group = groups.FirstOrDefault(x => x.PresentationMessage.Id == groupMessageId);
                 if (group.UserLists.Count == 1 && group.UserLists.First().UserLimit == 6 && group.IsFull)
                 {
                     var users = group.UserLists.First();

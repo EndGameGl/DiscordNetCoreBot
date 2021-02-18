@@ -1,5 +1,6 @@
 ﻿using Discord.Commands;
 using NetCoreDiscordBot.Services;
+using NetCoreDiscordBot.Services.Interfaces;
 using Newtonsoft.Json;
 using System.Linq;
 using System.Text;
@@ -9,9 +10,9 @@ namespace NetCoreDiscordBot.Modules.Commands
 {
     public class InfoModule : ModuleBase<SocketCommandContext>
     {
-        private GuildDataExtensionsService _guildDataExtensionsService { get; }
+        private IGuildDataExtensionsService _guildDataExtensionsService { get; }
         private CommandHandlingService _commandsService { get; }
-        public InfoModule(GuildDataExtensionsService guildDataExtensionsService, CommandHandlingService commandsService)
+        public InfoModule(IGuildDataExtensionsService guildDataExtensionsService, CommandHandlingService commandsService)
         {
             _guildDataExtensionsService = guildDataExtensionsService;
             _commandsService = commandsService;
@@ -20,8 +21,10 @@ namespace NetCoreDiscordBot.Modules.Commands
         [Command("Guild settings")]
         public async Task GetGuildSettings()
         {
-            var guildExtendedData = _guildDataExtensionsService.ExtendedGuilds[Context.Guild];           
-            await ReplyAsync($"```{JsonConvert.SerializeObject(guildExtendedData, new JsonSerializerSettings() { Formatting = Formatting.Indented })}```");
+            if (_guildDataExtensionsService.TryGetData(Context.Guild.Id, out var data))
+            {
+                await ReplyAsync($"```{JsonConvert.SerializeObject(data, new JsonSerializerSettings() { Formatting = Formatting.Indented })}```");
+            }
         }
 
         [Command("help")]

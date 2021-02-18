@@ -2,8 +2,10 @@
 using Discord.Rest;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
+using MongoDB.Driver;
 using NetCoreDiscordBot.Models.Groups;
 using NetCoreDiscordBot.Models.Groups.References;
+using NetCoreDiscordBot.Services.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,62 +13,58 @@ using System.Threading.Tasks;
 
 namespace NetCoreDiscordBot.Services
 {
-    public class GroupHandlingService
+    public class GroupHandlerService : IGroupHandlerService
     {
-        private readonly DebugService _debugService;
+        private readonly ILoggerService _logger;
         private readonly DiscordSocketClient _discordClient;
-        private readonly GroupsContext dataBase;
-        public Dictionary<ulong, List<Group>> GuildGroupLists { get; set; }
-        public GroupHandlingService(IServiceProvider services)
+
+        private readonly IMongoCollection<GroupReference> _groups;
+        private Dictionary<ulong, List<Group>> _guildGroups;
+
+        public GroupHandlerService(IServiceProvider services)
         {
-            _debugService = services.GetRequiredService<DebugService>();
+            var config = services.GetRequiredService<IConfigurationService>();
+            var collectionName = config.Configuration.GetSection("MongoDB:GroupsDatabase").Value;
+
+            _logger = services.GetRequiredService<ILoggerService>();
             _discordClient = services.GetRequiredService<DiscordSocketClient>();
-            dataBase = services.GetRequiredService<GroupsContext>();
-            GuildGroupLists = new Dictionary<ulong, List<Group>>();
+
+            _groups = services.GetRequiredService<IMongoDBAccessService>().GetCollection<GroupReference>(collectionName);
+
+            _guildGroups = new Dictionary<ulong, List<Group>>();
         }
         public async Task InitializeAsync()
         {
             foreach (var guild in _discordClient.Guilds)
             {
-                if (!GuildGroupLists.ContainsKey(guild.Id))
-                    GuildGroupLists.Add(guild.Id, new List<Group>());
+                if (!_guildGroups.ContainsKey(guild.Id))
+                    _guildGroups.Add(guild.Id, new List<Group>());
             }
+            await LoadAllGroups();
         }
-        public async Task AddGroupAndSaveToDataBase(Group group)
+        public async Task AddGroup(Group group)
         {
-            GuildGroupLists[group.Guild.Id].Add(group);
-            dataBase.Groups.Add(new GroupReference(group));
-            await dataBase.SaveChangesAsync();
+            _guildGroups[group.Guild.Id].Add(group);
+            await _groups.InsertOneAsync(new GroupReference(group));
         }
-        public async Task UpdateGroup(Group group)
+        public async Task ReplaceWithNewerGroup(Group group)
         {
-            var reference = dataBase.Groups.FirstOrDefault(x => x.GUID == group.Guid);
-            reference.Update(group);
-            dataBase.Groups.Update(reference);
-            await dataBase.SaveChangesAsync();
+            await _groups.ReplaceOneAsync(x => x.GUID == group.Guid, new GroupReference(group));
             await group.UpdateMessage();
         }
         public async Task RemoveGroup(Group group)
         {
-            dataBase.Groups.Remove(dataBase.Groups.FirstOrDefault(x => x.GUID == group.Guid));
-            await dataBase.SaveChangesAsync();
-            GuildGroupLists[group.Guild.Id].Remove(group);
+            await _groups.DeleteOneAsync(x => x.GUID == group.Guid);
+            _guildGroups[group.Guild.Id].Remove(group);
         }
-        public async Task LoadAllGroups()
+        private async Task LoadAllGroups()
         {
             foreach (var guild in _discordClient.Guilds)
             {
-                var references = await dataBase.GetGroupReferences(guild.Id);
-                foreach (var reference in references)
+                foreach (var reference in _groups.Find(x => x.GuildId == guild.Id).ToEnumerable())
                 {
-                    try
-                    {
-                        GuildGroupLists[guild.Id].Add(await LoadGroupFromReference(reference));
-                    }
-                    catch
-                    {
-                        dataBase.Remove(reference);
-                    }
+                    var loadedGroup = await LoadGroupFromReference(reference);
+                    _guildGroups[guild.Id].Add(loadedGroup);
                 }
             }
         }
@@ -96,9 +94,9 @@ namespace NetCoreDiscordBot.Services
                 List<SocketGuildUser> users = new List<SocketGuildUser>();
                 foreach (var id in userList.UserIds)
                 {
-                    if (guild.Users.Any(x => x.Id == id.Value))
+                    if (guild.Users.Any(x => x.Id == id))
                     {
-                        var nextUser = guild.GetUser(id.Value);
+                        var nextUser = guild.GetUser(id);
                         if (nextUser != null)
                             users.Add(nextUser);
                     }
@@ -125,7 +123,40 @@ namespace NetCoreDiscordBot.Services
         }
         public bool IsGroup(SocketGuild guild, ulong messageId)
         {
-            return GuildGroupLists[guild.Id].Any(x => x.PresentationMessage.Id == messageId);
+            return _guildGroups[guild.Id].Any(x => x.PresentationMessage.Id == messageId);
+        }
+        public bool TryGetGroup(ulong guildId, Guid guid, out Group group)
+        {
+            group = default;
+            if (_guildGroups.TryGetValue(guildId, out var groupList))
+            {
+                group = groupList.FirstOrDefault(x => x.Guid == guid);
+                return group != null;
+            }
+            else
+                return false;
+        }
+        public bool TryGetGroup(ulong guildId, ulong messageId, out Group group)
+        {
+            group = default;
+            if (_guildGroups.TryGetValue(guildId, out var groupList))
+            {
+                group = groupList.FirstOrDefault(x => x.PresentationMessage.Id == messageId);
+                return group != null;
+            }
+            else
+                return false;
+        }
+        public bool TryGetGuildGroups(ulong guildId, out IEnumerable<Group> groups)
+        {
+            groups = default;
+            if (_guildGroups.TryGetValue(guildId, out var groupList))
+            {
+                groups = groupList.AsEnumerable();
+                return true;
+            }
+            else
+                return false;
         }
     }
 }

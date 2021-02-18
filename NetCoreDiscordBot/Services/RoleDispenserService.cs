@@ -2,8 +2,10 @@
 using Discord.Rest;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
+using MongoDB.Driver;
 using NetCoreDiscordBot.Models.Dispensers;
 using NetCoreDiscordBot.Models.Dispensers.References;
+using NetCoreDiscordBot.Services.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,53 +14,55 @@ using System.Threading.Tasks;
 
 namespace NetCoreDiscordBot.Services
 {
-    public class RoleDispenserService
+    public class RoleDispenserService : IRoleDispenserService
     {
-        private readonly RoleDispensersContext _database;
+        private readonly ILoggerService _logger;
         private readonly DiscordSocketClient _discordClient;
-        public Dictionary<ulong, List<RoleDispenser>> GuildDispensers { get; set; }
+
+        private readonly IMongoCollection<RoleDispenserReference> _roleDispensers;
+        private Dictionary<ulong, List<RoleDispenser>> _guildDispensers;
+
         public RoleDispenserService(IServiceProvider services)
         {
-            _database = services.GetRequiredService<RoleDispensersContext>();
             _discordClient = services.GetRequiredService<DiscordSocketClient>();
-            GuildDispensers = new Dictionary<ulong, List<RoleDispenser>>();
+            _guildDispensers = new Dictionary<ulong, List<RoleDispenser>>();
+
+            var config = services.GetRequiredService<IConfigurationService>();
+            var collectionName = config.Configuration.GetSection("MongoDB:RoleDispensersDatabase").Value;
+
+            _roleDispensers = services.GetRequiredService<IMongoDBAccessService>().GetCollection<RoleDispenserReference>(collectionName);
         }
         public async Task InitializeAsync()
         {
             foreach (var guild in _discordClient.Guilds)
             {
-                if (!GuildDispensers.ContainsKey(guild.Id))
-                    GuildDispensers.Add(guild.Id, new List<RoleDispenser>());
+                if (!_guildDispensers.ContainsKey(guild.Id))
+                    _guildDispensers.Add(guild.Id, new List<RoleDispenser>());
             }
+            await LoadAllDispensers();
         }
-        public async Task AddDispenserAndSaveToDataBase(RoleDispenser dispenser)
+        public async Task AddRoleDispenser(RoleDispenser dispenser)
         {
-            GuildDispensers[dispenser.Guild.Id].Add(dispenser);
-            _database.DispenseresReferences.Add(new RoleDispenserReference(dispenser));
-            await _database.SaveChangesAsync();
+            _guildDispensers[dispenser.Guild.Id].Add(dispenser);
+            await _roleDispensers.InsertOneAsync(new RoleDispenserReference(dispenser));
         }
-        public async Task UpdateDispenser(RoleDispenser dispenser)
+        public async Task ReplaceWithNewerRoleDispenser(RoleDispenser dispenser)
         {
-            var reference = _database.DispenseresReferences.FirstOrDefault(x => x.Guid == dispenser.Guid);
-            reference.Update(dispenser);
-            _database.DispenseresReferences.Update(reference);
-            await _database.SaveChangesAsync();
+            await _roleDispensers.ReplaceOneAsync(x => x.Guid == dispenser.Guid, new RoleDispenserReference(dispenser));
             await dispenser.UpdateMessage();
         }
-        public async Task RemoveDispenser(RoleDispenser dispenser)
+        public async Task RemoveRoleDispenser(RoleDispenser dispenser)
         {
-            _database.DispenseresReferences.Remove(_database.DispenseresReferences.FirstOrDefault(x => x.Guid == dispenser.Guid));
-            await _database.SaveChangesAsync();
-            GuildDispensers[dispenser.Guild.Id].Remove(dispenser);
+            await _roleDispensers.DeleteOneAsync(x => x.Guid == dispenser.Guid);
+            _guildDispensers[dispenser.Guild.Id].Remove(dispenser);
         }
-        public async Task LoadAllDispensers()
+        private async Task LoadAllDispensers()
         {
             foreach (var guild in _discordClient.Guilds)
             {
-                var references = await _database.GetDispenserReferences(guild.Id);
-                foreach (var reference in references)
+                foreach (var reference in _roleDispensers.Find(x => x.GuildId == guild.Id).ToEnumerable())
                 {
-                    GuildDispensers[guild.Id].Add(await LoadDispenserFromReference(reference));
+                    _guildDispensers[guild.Id].Add(await LoadDispenserFromReference(reference));
                 }
             }
         }
@@ -89,9 +93,38 @@ namespace NetCoreDiscordBot.Services
                 EmoteToRoleBindings = bindings
             };
         }
-        public bool IsDispenser(SocketGuild guild, ulong messageId)
+        public bool TryGetRoleDispenser(ulong guildId, Guid guid, out RoleDispenser dispenser)
         {
-            return GuildDispensers[guild.Id].Any(x => x.ListenedMessage.Id == messageId);
+            dispenser = default;
+            if (_guildDispensers.TryGetValue(guildId, out var dispenserList))
+            {
+                dispenser = dispenserList.FirstOrDefault(x => x.Guid == guid);
+                return dispenser != null;
+            }
+            else
+                return false;
+        }
+        public bool TryGetRoleDispenser(ulong guildId, ulong messageId, out RoleDispenser dispenser)
+        {
+            dispenser = default;
+            if (_guildDispensers.TryGetValue(guildId, out var dispenserList))
+            {
+                dispenser = dispenserList.FirstOrDefault(x => x.ListenedMessage.Id == messageId);
+                return dispenser != null;
+            }
+            else
+                return false;
+        }
+        public bool TryGetGuildRoleDispensers(ulong guildId, out IEnumerable<RoleDispenser> dispensers)
+        {
+            dispensers = default;
+            if (_guildDispensers.TryGetValue(guildId, out var dispenserList))
+            {
+                dispensers = dispenserList.AsEnumerable();
+                return dispensers != null;
+            }
+            else
+                return false;
         }
     }
 }

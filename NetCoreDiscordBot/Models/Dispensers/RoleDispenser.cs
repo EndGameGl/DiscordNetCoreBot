@@ -31,7 +31,6 @@ namespace NetCoreDiscordBot.Models.Dispensers
                 }
                 return mesBuilder.ToString();
             }  
-            private set { } 
         }
 
         public RoleDispenser() { }

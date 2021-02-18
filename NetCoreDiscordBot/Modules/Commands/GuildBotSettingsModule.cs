@@ -2,6 +2,7 @@
 using Discord.WebSocket;
 using NetCoreDiscordBot.Models.Guilds;
 using NetCoreDiscordBot.Services;
+using NetCoreDiscordBot.Services.Interfaces;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -11,8 +12,8 @@ namespace NetCoreDiscordBot.Modules.Commands
     [RequireContext(ContextType.Guild)]
     public class GuildBotSettingsModule : ModuleBase<SocketCommandContext>
     {
-        private GuildDataExtensionsService _guildDataExtensionsService { get; }
-        public GuildBotSettingsModule(GuildDataExtensionsService guildDataExtensionsService)
+        private IGuildDataExtensionsService _guildDataExtensionsService { get; }
+        public GuildBotSettingsModule(IGuildDataExtensionsService guildDataExtensionsService)
         {
             _guildDataExtensionsService = guildDataExtensionsService;
         }
@@ -20,49 +21,60 @@ namespace NetCoreDiscordBot.Modules.Commands
         [Command("set prefix")]
         public async Task SetGuildPrefix(char newPrefix)
         {
-            _guildDataExtensionsService.ExtendedGuilds[Context.Guild].CommandPrefix = newPrefix;
-            await _guildDataExtensionsService.ForceSaveDb();
-            await ReplyAsync($"Changed prefix for this server to: {_guildDataExtensionsService.ExtendedGuilds[Context.Guild].CommandPrefix}");
+            if (_guildDataExtensionsService.TryGetData(Context.Guild.Id, out var data))
+            {
+                data.CommandPrefix = newPrefix;
+                await _guildDataExtensionsService.SaveGuildData(Context.Guild.Id);
+                await ReplyAsync($"Changed prefix for this server to: {data.CommandPrefix}");
+            }
         }
 
         [Command("set api token")]
         public async Task SetAPIToken(string newToken)
         {
-            _guildDataExtensionsService.ExtendedGuilds[Context.Guild].APIToken = newToken;
-            await _guildDataExtensionsService.ForceSaveDb();
-            await ReplyAsync($"Changed prefix for this server to: {_guildDataExtensionsService.ExtendedGuilds[Context.Guild].APIToken}");
+            if (_guildDataExtensionsService.TryGetData(Context.Guild.Id, out var data))
+            {
+                data.APIToken = newToken;
+                await _guildDataExtensionsService.SaveGuildData(Context.Guild.Id);
+                await ReplyAsync($"Changed prefix for this server to: {data.APIToken}");
+            }
         }
 
         [Command("add bot admin")]        
         public async Task AddBotAdmin(SocketGuildUser newAdmin)
         {
-            var admins = _guildDataExtensionsService.ExtendedGuilds[Context.Guild].Admins;
-            if (!admins.Any(x => x.AdminId == newAdmin.Id))
+            if (_guildDataExtensionsService.TryGetData(Context.Guild.Id, out var data))
             {
-                admins.Add(new GuildDataExtensionAdminEntry() { AdminId = newAdmin.Id });
-                await _guildDataExtensionsService.ForceSaveDb();
-                await ReplyAsync($"Added user {newAdmin.Mention} as new bot admin!");
-            }
-            else
-            {
-                await ReplyAsync($"This user is already admin.");
-            }            
+                var admins = data.Admins;
+                if (!admins.Any(x => x == newAdmin.Id))
+                {
+                    admins.Add(newAdmin.Id);
+                    await _guildDataExtensionsService.SaveGuildData(Context.Guild.Id);
+                    await ReplyAsync($"Added user {newAdmin.Mention} as new bot admin!");
+                }
+                else
+                {
+                    await ReplyAsync($"This user is already admin.");
+                }
+            }                         
         }
 
         [Command("remove bot admin")]
         public async Task RemoveBotAdmin(SocketGuildUser newAdmin)
         {
-            var admins = _guildDataExtensionsService.ExtendedGuilds[Context.Guild].Admins;
-            if (admins.Any(x => x.AdminId == newAdmin.Id))
+            if (_guildDataExtensionsService.TryGetData(Context.Guild.Id, out var data))
             {
-                var admin = admins.FirstOrDefault(x => x.AdminId == newAdmin.Id);
-                admins.Remove(admin);
-                await _guildDataExtensionsService.ForceSaveDb();
-                await ReplyAsync($"Removed user {newAdmin.Mention} from bot admins.");
-            }
-            else
-            {
-                await ReplyAsync($"This user is not admin.");
+                var admins = data.Admins;
+                if (admins.Any(x => x == newAdmin.Id))
+                {
+                    admins.Remove(newAdmin.Id);
+                    await _guildDataExtensionsService.SaveGuildData(Context.Guild.Id);
+                    await ReplyAsync($"Removed user {newAdmin.Mention} from bot admins.");
+                }
+                else
+                {
+                    await ReplyAsync($"This user is not admin.");
+                }
             }
         }
 
