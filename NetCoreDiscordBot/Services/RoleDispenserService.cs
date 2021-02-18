@@ -2,6 +2,7 @@
 using Discord.Rest;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using NetCoreDiscordBot.Models.Dispensers;
 using NetCoreDiscordBot.Models.Dispensers.References;
@@ -16,6 +17,8 @@ namespace NetCoreDiscordBot.Services
 {
     public class RoleDispenserService : IRoleDispenserService
     {
+        private Dictionary<Guid, ObjectId> _dispensersToDBMappings;
+
         private readonly ILoggerService _logger;
         private readonly DiscordSocketClient _discordClient;
 
@@ -48,7 +51,7 @@ namespace NetCoreDiscordBot.Services
         }
         public async Task ReplaceWithNewerRoleDispenser(RoleDispenser dispenser)
         {
-            await _roleDispensers.ReplaceOneAsync(x => x.Guid == dispenser.Guid, new RoleDispenserReference(dispenser));
+            await _roleDispensers.ReplaceOneAsync(x => x.Guid == dispenser.Guid, new RoleDispenserReference(dispenser) { _id = _dispensersToDBMappings[dispenser.Guid] });
             await dispenser.UpdateMessage();
         }
         public async Task RemoveRoleDispenser(RoleDispenser dispenser)
@@ -58,11 +61,14 @@ namespace NetCoreDiscordBot.Services
         }
         private async Task LoadAllDispensers()
         {
+            _dispensersToDBMappings = new Dictionary<Guid, ObjectId>();
             foreach (var guild in _discordClient.Guilds)
             {
                 foreach (var reference in _roleDispensers.Find(x => x.GuildId == guild.Id).ToEnumerable())
                 {
-                    _guildDispensers[guild.Id].Add(await LoadDispenserFromReference(reference));
+                    var loadedDispenser = await LoadDispenserFromReference(reference);
+                    _guildDispensers[guild.Id].Add(loadedDispenser);
+                    _dispensersToDBMappings.Add(loadedDispenser.Guid, reference._id);
                 }
             }
         }

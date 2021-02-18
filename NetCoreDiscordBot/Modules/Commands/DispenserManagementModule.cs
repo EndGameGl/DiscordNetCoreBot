@@ -2,12 +2,7 @@
 using Discord.Commands;
 using Discord.WebSocket;
 using NetCoreDiscordBot.Models.Dispensers;
-using NetCoreDiscordBot.Services;
 using NetCoreDiscordBot.Services.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace NetCoreDiscordBot.Modules.Commands
@@ -26,8 +21,8 @@ namespace NetCoreDiscordBot.Modules.Commands
         public async Task CreateDispenser(params string[] description)
         {
             RoleDispenser dispenser = new RoleDispenser(Context.Guild, (SocketTextChannel)Context.Channel, string.Join(' ', description));
-            await _service.AddRoleDispenser(dispenser);
             await dispenser.SendMessage();
+            await _service.AddRoleDispenser(dispenser);
         }
         [Command("add"), RequireOwner]
         public async Task AddBinding(ulong messageId, string emojiText, IRole role)

@@ -1,18 +1,20 @@
 ﻿using BungieNetCoreAPI;
 using BungieNetCoreAPI.Clients;
 using BungieNetCoreAPI.Destiny;
+using NetCoreDiscordBot.Services.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
 namespace NetCoreDiscordBot.Services
 {
-    public class BungieService
+    public class BungieService : IBungieService
     {
-        public readonly BungieClient Client;
+        private readonly BungieClient _client;
+        public BungieClient Client => _client;
         public BungieService(IServiceProvider services)
         {
-            Client = new BungieClient(
+            _client = new BungieClient(
                 new BungieClientSettings() 
                 { 
                      UseExistingConfig = true,

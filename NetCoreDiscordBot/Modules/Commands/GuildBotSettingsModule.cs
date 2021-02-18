@@ -1,7 +1,5 @@
 ﻿using Discord.Commands;
 using Discord.WebSocket;
-using NetCoreDiscordBot.Models.Guilds;
-using NetCoreDiscordBot.Services;
 using NetCoreDiscordBot.Services.Interfaces;
 using System.Linq;
 using System.Threading.Tasks;
