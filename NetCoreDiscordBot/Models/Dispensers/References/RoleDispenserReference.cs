@@ -1,4 +1,5 @@
-﻿using MongoDB.Bson.Serialization.Attributes;
+﻿using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -7,8 +8,7 @@ namespace NetCoreDiscordBot.Models.Dispensers.References
 {
     public class RoleDispenserReference
     {
-        [BsonId]
-        public int _id;
+        public ObjectId _id { get; set; }
         public Guid Guid { get; set; }
         public string Description { get; set; }
         public ulong GuildId { get; set; }

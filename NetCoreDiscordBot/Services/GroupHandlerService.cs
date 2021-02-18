@@ -2,6 +2,7 @@
 using Discord.Rest;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using NetCoreDiscordBot.Models.Groups;
 using NetCoreDiscordBot.Models.Groups.References;
@@ -15,6 +16,8 @@ namespace NetCoreDiscordBot.Services
 {
     public class GroupHandlerService : IGroupHandlerService
     {
+        private Dictionary<Guid, ObjectId> _groupToDBMappings;
+
         private readonly ILoggerService _logger;
         private readonly DiscordSocketClient _discordClient;
 
@@ -43,28 +46,34 @@ namespace NetCoreDiscordBot.Services
             await LoadAllGroups();
         }
         public async Task AddGroup(Group group)
-        {
+        {        
             _guildGroups[group.Guild.Id].Add(group);
             await _groups.InsertOneAsync(new GroupReference(group));
+            var groupId = (await _groups.Find(x => x.GUID == group.Guid).FirstAsync())._id;
+            _groupToDBMappings.Add(group.Guid, groupId);
         }
         public async Task ReplaceWithNewerGroup(Group group)
         {
-            await _groups.ReplaceOneAsync(x => x.GUID == group.Guid, new GroupReference(group));
+            var oldId = _groupToDBMappings[group.Guid];
+            await _groups.ReplaceOneAsync(x => x.GUID == group.Guid, new GroupReference(group) { _id = oldId });
             await group.UpdateMessage();
         }
         public async Task RemoveGroup(Group group)
         {
+            _groupToDBMappings.Remove(group.Guid);
             await _groups.DeleteOneAsync(x => x.GUID == group.Guid);
             _guildGroups[group.Guild.Id].Remove(group);
         }
         private async Task LoadAllGroups()
         {
+            _groupToDBMappings = new Dictionary<Guid, ObjectId>();
             foreach (var guild in _discordClient.Guilds)
             {
                 foreach (var reference in _groups.Find(x => x.GuildId == guild.Id).ToEnumerable())
                 {
                     var loadedGroup = await LoadGroupFromReference(reference);
                     _guildGroups[guild.Id].Add(loadedGroup);
+                    _groupToDBMappings.Add(loadedGroup.Guid, reference._id);
                 }
             }
         }
