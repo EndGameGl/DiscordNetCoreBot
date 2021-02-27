@@ -81,6 +81,7 @@ namespace NetCoreDiscordBot
             serviceProvider.AddSingleton<IGroupHandlerService, GroupHandlerService>();
             serviceProvider.AddSingleton<IRoleDispenserService, RoleDispenserService>();
             serviceProvider.AddSingleton<IGuildDataExtensionsService, GuildDataExtensionsService>();
+            serviceProvider.AddSingleton<IUserDataService, UserDataService>();
             serviceProvider.AddSingleton<IBungieService, BungieService>();
 
 

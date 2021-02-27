@@ -61,6 +61,7 @@ namespace NetCoreDiscordBot.Services
             var groupsDB = configs.Configuration.GetSection("MongoDB:GroupsDatabase").Value;
             var dispensersDB = configs.Configuration.GetSection("MongoDB:RoleDispensersDatabase").Value;
             var guildSettingsDB = configs.Configuration.GetSection("MongoDB:GuildSettingsDatabase").Value;
+            var userDataDB = configs.Configuration.GetSection("MongoDB:UserDataDatabase").Value;
 
             var existingCollections = _botDB.ListCollectionNames().ToList();
 
@@ -72,6 +73,9 @@ namespace NetCoreDiscordBot.Services
 
             if (!existingCollections.Contains(guildSettingsDB))
                 _botDB.CreateCollection(guildSettingsDB);
+
+            if (!existingCollections.Contains(userDataDB))
+                _botDB.CreateCollection(userDataDB);
         }
     }
 }

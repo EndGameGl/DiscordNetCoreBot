@@ -54,12 +54,14 @@ namespace NetCoreDiscordBot.Modules.Commands
                     {
                         JToken token = JToken.Parse(result);
                         var indentedResult = token.ToString(Formatting.Indented);
-                        if (indentedResult.Length <= 2000) 
+                        if (indentedResult.Length <= 2000)
                         {
-                            await ReplyAsync($"```{indentedResult}```");                            
+                            await ReplyAsync($"```{indentedResult}```");
                         }
                         else
-                            await ReplyAsync("Definition is too long to display.");
+                        {
+                            await ReplyAsync($"```{indentedResult.Substring(0, 1989)}\n...```");
+                        }
                     }
                     else
                         await ReplyAsync("Definition is too long to display.");

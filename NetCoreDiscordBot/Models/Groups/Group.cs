@@ -108,6 +108,16 @@ namespace NetCoreDiscordBot.Models.Groups
             }
             await Channel.SendMessageAsync(stringBuilder.ToString());
         }
+        public async Task ReloadGroup()
+        {
+            foreach (var list in UserLists)
+            {
+                var listCheckTreshold = list.UserLimit ?? 50;
+                var reactions = (await PresentationMessage.GetReactionUsersAsync(list.JoinEmote, listCheckTreshold).FlattenAsync()).Cast<SocketGuildUser>();
+                list.Users = list.Users.Intersect(reactions).Take(listCheckTreshold).ToList();
+            }
+            await UpdateMessage();
+        }
         public override string ToString()
         {
             return $"Group: {Description}, {UserLists.Sum(x => x.Users.Count)} users";

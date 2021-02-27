@@ -1,9 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace NetCoreDiscordBot.Models.Dispensers.References
 {
-    [Owned]
     public class EmoteRolePairReference
     {
         public int Id { get; set; }

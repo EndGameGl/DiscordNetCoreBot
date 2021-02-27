@@ -50,6 +50,10 @@ namespace NetCoreDiscordBot.Services
                                 await connectedGroup.SendAnnouncement(guildChannel.Guild.GetUser(reaction.UserId));
                             }
                         }
+                        else if (reaction.Emote.Name == _config.Configuration["Emojis:DefaultReloadEmoji"])
+                        {
+                            await connectedGroup.ReloadGroup();
+                        }
                         else
                         {
                             var userList = connectedGroup.UserLists.FirstOrDefault(x => x.JoinEmote.Name == reaction.Emote.Name);

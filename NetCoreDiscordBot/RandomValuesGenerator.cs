@@ -61,5 +61,7 @@ namespace NetCoreDiscordBot
             }
             return result.ToString();
         }
+
+        public static bool GetBool(double chance) => random.NextDouble() < chance;
     }
 }
